@@ -14,7 +14,9 @@ body {
 	position: absolute;
 	top: 10px;
 	width: 100%;
+	max-width: 646px;
 	text-align: center;
 	z-index: 100;
 	display:block;
+	overflow: hidden;
 }
