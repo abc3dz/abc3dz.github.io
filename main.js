@@ -5,7 +5,8 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import Stats from 'three/addons/libs/stats.module.js';
 import gsap from "gsap";
 //import { loadGlb } from './loadGlb.js';
-let container, gui, camera, scene, renderer, stats, controls;
+
+let container, gui, camera, scene, renderer, stats, controls, flag;
 /*let lastUpdate = Date.now();
 const gridSize = 3;
 const totalFrames = 9;
@@ -35,9 +36,63 @@ var parameters =
     'Y': 0.0,
     'Z': 0.0
 };
+//loop
+let time = 0;
+// Vertex Shader - สร้างการโบกสะบัด
+const vertexShader = `
+    varying vec2 vUv;
+    uniform float uTime;
+    
+    void main() {
+        vUv = uv;
+        vec3 pos = position;
+        
+        // สร้างคลื่นในแนวนอน
+        float wave1 = sin(pos.x * 3.0 + uTime * 2.0) * 0.1;
+        float wave2 = sin(pos.x * 5.0 + uTime * 3.0) * 0.05;
+        
+        // สร้างการโบกที่ลดลงตามแนวนอน
+        float waveDecay = (pos.x + 1.0) * 0.5;
+        pos.z = (wave1 + wave2) * waveDecay;
+        
+        // เพิ่มการโค้งเล็กน้อยในแนวตั้ง
+        pos.z += sin(pos.y * 2.0 + uTime * 1.5) * 0.03 * waveDecay;
+        
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+`;
+
+// Fragment Shader - วาดลายธงชาติไทย 5 แถบสี
+const fragmentShader = `
+    varying vec2 vUv;
+    
+    void main() {
+        // กำหนดสี
+        vec3 red = vec3(0.769, 0.051, 0.102);    // สีแดง
+        vec3 white = vec3(1.0, 1.0, 1.0);         // สีขาว
+        vec3 blue = vec3(0.157, 0.204, 0.467);   // สีน้ำเงิน
+        
+        vec3 color;
+        float y = vUv.y;
+        
+        // แบ่งเป็น 5 แถบ (จากบนลงล่าง: แดง, ขาว, น้ำเงิน, ขาว, แดง)
+        if (y > 0.833) {
+            color = red;           // แถบบน - แดง (1/6)
+        } else if (y > 0.667) {
+            color = white;         // ขาว (1/6)
+        } else if (y > 0.333) {
+            color = blue;          // กลาง - น้ำเงิน (2/6)
+        } else if (y > 0.167) {
+            color = white;         // ขาว (1/6)
+        } else {
+            color = red;           // แถบล่าง - แดง (1/6)
+        }
+        
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
 
 init();
-//animate();
 
 function init() {
 
@@ -70,10 +125,25 @@ function init() {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.update();
 
-    stats = new Stats();
-    container.appendChild(stats.dom);
+    //stats = new Stats();
+    //container.appendChild(stats.dom);
 
     window.addEventListener('resize', onWindowResize);
+
+    const geometry = new THREE.PlaneGeometry(3, 2, 64, 64);
+    const material = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        uniforms: {
+            uTime: { value: 0 }
+        },
+        side: THREE.DoubleSide
+    });
+
+    flag = new THREE.Mesh(geometry, material);
+    flag.position.set(0, 0, -15);
+    flag.scale.set(5*5, 3.33*5, 1*5);
+    scene.add(flag);
 
     let allIcon;
     const loaderAllIcon = new GLTFLoader().setPath('models/');
@@ -128,7 +198,7 @@ function init() {
     const loaderKrajangYai = new GLTFLoader().setPath('models/');
     loaderKrajangYai.load('LaiThai_KrajangYai.glb', async function (gltf) {
         const model = gltf.scene;
-        model.position.set(0, -11, -16);
+        model.position.set(0, -11, -8);
         krajangYai = gltf.scene;
         await renderer.compileAsync(model, camera, scene);
         model.traverse((child) => {
@@ -146,7 +216,7 @@ function init() {
     const loaderKrajangLek = new GLTFLoader().setPath('models/');
     loaderKrajangLek.load('LaiThai_KrajangLek.glb', async function (gltf) {
         const model = gltf.scene;
-        model.position.set(0, -7, -8);
+        model.position.set(0, -7, -3);
         krajangLek = gltf.scene;
         await renderer.compileAsync(model, camera, scene);
         model.traverse((child) => {
@@ -243,7 +313,7 @@ createFallingSnow();
                     window.open('https://github.com/abc3dz', '_blank');
                     break;
                 case "ObjReddit":
-                    window.open('https://www.reddit.com/user/abc3dz', '_blank');
+                    window.open('https://www.reddit.com/user/abczezeze', '_blank');
                     break;
                 case "ObjVercel":
                     gsap.to(ClickObj.rotation, {
@@ -400,8 +470,12 @@ function animate() {
     if (GeometricBowling) GeometricBowling.rotation.y += 0.55 * delta;
     if (YingLeak) YingLeak.rotation.y += 0.37 * delta;
 
+    time += 0.016;
+    flag.material.uniforms.uTime.value = time;
+    flag.rotation.y = Math.sin(time * 0.3) * 0.1;
+
     //controls.update();
     renderer.render(scene, camera);
-    stats.update();
+    //stats.update();
 }
 animate();
